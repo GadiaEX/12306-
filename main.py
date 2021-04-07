@@ -1,154 +1,86 @@
 from urllib import request
-import re
 import urllib
 import http.cookiejar
-import time
-from urllib import parse
-
+import json
 # 生成全局的cookie
 c = http.cookiejar.LWPCookieJar()
 cookie = urllib.request.HTTPCookieProcessor(c)
 opener = urllib.request.build_opener(cookie)
 urllib.request.install_opener(opener)
 
-
-# 初始化，包括拿到验证用的cookie
-def init():
-    init_header = {
-        'Host': 'kyfw.12306.cn',
-        'Origin': 'https://kyfw.12306.cn',
-        'Referer': 'https://kyfw.12306.cn/otn/resources/login.html',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7'
-    }
-    url = "https://www.12306.cn/index/otn/login/conf"
-    init_request = request.Request(url, headers=init_header)
-    response = opener.open(init_request)
-
-    cookie_url = "https://kyfw.12306.cn/otn/resources/login.html"
-    cookie_request = request.Request(cookie_url, headers=init_header)
-    opener.open(cookie_request)
-
-    # 模仿浏览器发的，我也不知道这东西是啥子
-    cookie_request = request.Request("https://kyfw.12306.cn/otn/login/conf", headers=init_header)
-    opener.open(cookie_request)
-
-    # 添加验证header
-    checkHeaer = {
-        'Host': 'kyfw.12306.cn',
-        'Origin': 'https://kyfw.12306.cn',
-        'Referer': 'https://kyfw.12306.cn/otn/resources/login.html',
-        'keep-alive': 'keep-alive'
-    }
-
-    # 检查登陆状态
-    login_check_url = "https://kyfw.12306.cn/passport/web/auth/uamtk-static"
-    login_data = {'appid': 'otn'}
-    login_data = urllib.parse.urlencode(login_data).encode('ascii')
-
-    login_check_request = request.Request(login_check_url, method='POST', data=login_data, headers=init_header)
-    # login_check_request.add_header({'Host': 'kyfw.12306.cn'})
-    response = opener.open(login_check_request)
-    print(response.read())
+header = {
+    'Host': 'kyfw.12306.cn',
+    'Origin': 'https://kyfw.12306.cn',
+    'Referer': 'https://kyfw.12306.cn/otn/resources/login.html',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+    'cookie': '_uab_collina=159421192629070267972786; JSESSIONID=C0C93D41C28A3AC97655010034393203; RAIL_EXPIRATION=1617504858119; RAIL_DEVICEID=Vf0tGLvXMOOCaMXvnqTVqST_KmnHKn7olVsHN2zEmnaEkDV8UQevgdxf5sjbnyoqERcREU08uQZkixZzJ7ky8IBg0pe5Jl1kiyT8MM53vJ1fad8z-w5_EDzPmkR6X0tEEkjckDqJJAsqxkvp3kBxCbMt6m_cJQWH; BIGipServerotn=3973513482.50210.0000; BIGipServerpassport=954728714.50215.0000; route=6f50b51faa11b987e576cdb301e545c4'
+}
 
 
-# 验证码来的，懒得搞滑块，就是试验下而已
-def getImg():
-    # 首先获得时间戳
-    current_time = str(time.time())
-    current_time = current_time.replace('.', '')
-    current_time = current_time[0:13]
-    baseCheckUrl = "https://kyfw.12306.cn/passport/captcha/captcha-image64?login_site=E&module=login&rand=sjrand&"
-    baseCheckUrl += current_time
-    return opener.open(baseCheckUrl)
-
-
-def get_QR_Img():
-    qr_url = "https://kyfw.12306.cn/passport/web/create-qr64"
-    header = {
-        'Host': 'kyfw.12306.cn',
-        'Origin': 'https://kyfw.12306.cn',
-        'Referer': 'https://kyfw.12306.cn/otn/resources/login.html',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7'
-    }
-    qr_data = {'appid': 'otn'}
-    qr_data = urllib.parse.urlencode(qr_data).encode('ascii')
-
-    qr_request = request.Request(url=qr_url, data=qr_data, method='POST', headers=header)
-    response = opener.open(qr_request)
+def urlopen(url, headers=None, data=None, method='GET'):
+    if headers is None:
+        headers = header
+    req = request.Request(url=url, data=data, headers=header, method=method)
+    response = opener.open(req)
     return response
 
 
-# 现在改为QR生成专用的了，如果还是要去生成验证码图的话，请修改re正则表达式
-def decodeImg(code):
-    # 拿到了code之后，首先解析出加密内容
-    print(code)
-    img_patt = re.compile(r'"image":"(.*?)","result_message')
-    state_patt = re.compile(r'"result_code":"(.?)","uuid"')
-    code = str(code)
-    img_code = (img_patt.findall((code)))
-    state_code = state_patt.findall(code)
-    print("返回状态码为：" + state_code[0])
-    img_url = img_code[0]
-    # 解析完成后，解析并写入
-    import base64
-    img = base64.urlsafe_b64decode(img_url)
-    fh = open("img.jpg", "wb")
-    fh.write(img)
-    fh.close()
+class Ticket:
+    time = '2021-04-02'
+    leftStation = 'SNQ'  # 韶关
+    toStation = 'IZQ'  # 广州南
+    tickKind = [
+        '0X00',
+        'ADULT'
+    ]
+    baseUrl = 'https://kyfw.12306.cn/otn/leftTicket/query'
 
-    # 新增加内容，我们顺路把uuid一起提出来并且返回
-    uuid_patt = re.compile(r'"uuid":"(.*?)"}')
-    uuid = uuid_patt.findall(code)
-    return uuid[0]
-
-def check_login():
-    pass
+    def getTicketUrl(self):
+        finalUrl = self.baseUrl + '?leftTicketDTO.train_date=' + self.time + '&leftTicketDTO.from_station=' + self.leftStation + '&leftTicketDTO.to_station=' + self.toStation + '&purpose_codes=' + self.tickKind[1]
+        return finalUrl
 
 
 
-# 查询QR是否还有用
-def QRquery(uuid):
-    header = {
-        'Host': 'kyfw.12306.cn',
-        'Origin': 'https://kyfw.12306.cn',
-        'Referer': 'https://kyfw.12306.cn/otn/resources/login.html',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
-        'RAIL_DEVICEID': 'Vf0tGLvXMOOCaMXvnqTVqST_KmnHKn7olVsHN2zEmnaEkDV8UQevgdxf5sjbnyoqERcREU08uQZkixZzJ7ky8IBg0pe5Jl1kiyT8MM53vJ1fad8z-w5_EDzPmkR6X0tEEkjckDqJJAsqxkvp3kBxCbMt6m_cJQWH',
-        'RAIL_EXPIRATION': '1617504858119'
+ticketInfo = Ticket()
 
-    }
-    check_url = "https://kyfw.12306.cn/passport/web/checkqr"
-    data = {
-        'RAIL_DEVICEID': 'Vf0tGLvXMOOCaMXvnqTVqST_KmnHKn7olVsHN2zEmnaEkDV8UQevgdxf5sjbnyoqERcREU08uQZkixZzJ7ky8IBg0pe5Jl1kiyT8MM53vJ1fad8z-w5_EDzPmkR6X0tEEkjckDqJJAsqxkvp3kBxCbMt6m_cJQWH',
-        'RAIL_EXPIRATION': '1617504858119',
-        'uuid': uuid,
-        'appid': 'otn'
-    }
-    data = urllib.parse.urlencode(data).encode('ascii')
-    check_request = request.Request(url=check_url, data=data, method='POST', headers=header)
-    html = opener.open(check_request)
-    print(html.read())
+response = urlopen(url=ticketInfo.getTicketUrl())
+html = json.loads(response.read())
+trainInfo =   html['data']['result']
+
+''''
+4:车次
+5：车辆起始站
+6：车辆终点站
+7：本车票起始站点
+8：本车票到站站点
+9：出发时间
+10:到站时间
+11：历时
+12：有票与否
+13:
+14:日期
+31:二等座
+32:一等座
+33：商务
+候补是哪个？
 
 
-init()
-response = get_QR_Img()
-uuid = decodeImg(response.read())
 
-import platform
-import os
+'''''
+index = int(0)
 
-userPlatform = platform.system()
+for each in trainInfo:
+    tempList = each.split('|')
+    if(tempList[11] == 'Y'):
+            print('车次为:' + tempList[3] +
+                  '\t起始：:' + tempList[6] +
+                  '\t到：' + tempList[7] +
+                  '\t日期：' + tempList[13] +
+                  '\t二等座数量：' + tempList[30] +
+                  '\t一等座数量：' + tempList[31] )
+            index+=1
+    else:
+        continue
 
-file = 'img.jpg'
-os.startfile(file)
-
-i = int(0)
-while 1:
-    QRquery(uuid)
-    time.sleep(1)
-    i += 1
-    if i == 50:
-        break
+print(index)
